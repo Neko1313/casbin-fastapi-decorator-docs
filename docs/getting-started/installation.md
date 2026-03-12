@@ -45,7 +45,7 @@ pip install "casbin-fastapi-decorator[db]"
 
 ### Casdoor integration
 
-Adds `CasdoorUserProvider` — authenticates users via [Casdoor](https://casdoor.org/) OAuth2 and validates access/refresh token cookies.
+Adds `CasdoorIntegration` and related helpers for [Casdoor](https://casdoor.org/) OAuth2 login, cookie-based authentication, and remote policy enforcement.
 
 ```bash
 pip install "casbin-fastapi-decorator[casdoor]"

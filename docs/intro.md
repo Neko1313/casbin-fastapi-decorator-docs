@@ -43,7 +43,7 @@ The core package handles authorization. Three optional extras extend it:
 |---|---|
 | [`jwt`](./extras/jwt/overview) | JWT token extraction and validation from Bearer headers or cookies |
 | [`db`](./extras/db/overview) | Loading Casbin policies from a SQLAlchemy async database |
-| [`casdoor`](./extras/casdoor/overview) | OAuth2 authentication via [Casdoor](https://casdoor.org/) with remote policy enforcement |
+| [`casdoor`](./extras/casdoor/overview) | OAuth2 login, cookie-based authentication, and remote policy enforcement via [Casdoor](https://casdoor.org/) |
 
 ## Requirements
 
