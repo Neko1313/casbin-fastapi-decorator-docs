@@ -42,14 +42,19 @@ async def get_current_user(
 
 ### `enforcer_provider`
 
-A FastAPI dependency that returns a configured `casbin.Enforcer` instance. Called on every request where permission checking is needed.
+A FastAPI dependency that returns a configured `casbin.Enforcer` instance. It is
+resolved on every request where permission checking is needed, but the provider
+itself may return a cached enforcer.
 
 ```python
 async def get_enforcer() -> casbin.Enforcer:
     return casbin.Enforcer("casbin/model.conf", "casbin/policy.csv")
 ```
 
-For production use, consider caching the enforcer instance instead of recreating it on every request. See the [Database extra](../extras/db/overview) for a `DatabaseEnforcerProvider` that handles this.
+For production use, prefer a provider that caches the enforcer instance instead
+of recreating it on every request. See the [File extra](../extras/file/overview)
+for `CachedFileEnforcerProvider` or the [Database extra](../extras/db/overview)
+for `DatabaseEnforcerProvider`.
 
 ### `error_factory`
 

@@ -27,6 +27,16 @@ uv add casbin-fastapi-decorator
 
 The core package is intentionally minimal. Install only what you need:
 
+### File-based policies with hot-reload
+
+Adds `CachedFileEnforcerProvider` - caches the Casbin enforcer loaded from
+`model.conf` and `policy.csv`, and reloads it automatically when either file
+changes.
+
+```bash
+pip install "casbin-fastapi-decorator[file]"
+```
+
 ### JWT authentication
 
 Adds `JWTUserProvider` — extracts and validates JWT tokens from Bearer headers or cookies.
@@ -37,7 +47,9 @@ pip install "casbin-fastapi-decorator[jwt]"
 
 ### Database policies
 
-Adds `DatabaseEnforcerProvider` — loads Casbin policies from a SQLAlchemy async session instead of a `.csv` file.
+Adds `DatabaseEnforcerProvider` - loads policies from a SQLAlchemy async
+session, caches the enforcer, and hot-reloads when `model.conf` or database
+rows change.
 
 ```bash
 pip install "casbin-fastapi-decorator[db]"
@@ -54,7 +66,7 @@ pip install "casbin-fastapi-decorator[casdoor]"
 ### Install everything
 
 ```bash
-pip install "casbin-fastapi-decorator[jwt,db,casdoor]"
+pip install "casbin-fastapi-decorator[file,jwt,db,casdoor]"
 ```
 
 ## Dependencies

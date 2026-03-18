@@ -120,6 +120,35 @@ async def seed_policies() -> None:
 app = FastAPI(lifespan=lifespan)
 ```
 
+## Lifespan integration for hot-reload
+
+Use the provider as an async context manager so it can start the `model.conf`
+watcher and the background polling task:
+
+```python
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+
+enforcer_provider = DatabaseEnforcerProvider(
+    model_path="casbin/model.conf",
+    session_factory=async_session,
+    policy_model=Policy,
+    policy_mapper=lambda p: (p.sub, p.obj, p.act),
+)
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    async with enforcer_provider:
+        yield
+    await engine.dispose()
+
+app = FastAPI(lifespan=lifespan)
+```
+
+Without `async with enforcer_provider`, the enforcer is still cached, but the
+provider will not watch the model file or poll the database for changes.
+
 ## Managing policies at runtime
 
 Since policies live in the database, you can add a management API:
@@ -156,5 +185,6 @@ async def remove_policy(sub: str, obj: str, act: str) -> dict:
 ```
 
 :::note
-Policy changes take effect on the **next request** since `DatabaseEnforcerProvider` creates a fresh enforcer on each call.
+Policy changes take effect after the next polling cycle (`poll_interval`,
+default `30.0` seconds) and are then visible on the next request.
 :::

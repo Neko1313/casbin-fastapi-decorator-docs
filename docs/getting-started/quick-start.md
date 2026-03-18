@@ -9,7 +9,7 @@ A complete working example in under 5 minutes.
 ## 1. Install
 
 ```bash
-pip install casbin-fastapi-decorator
+pip install "casbin-fastapi-decorator[file]" uvicorn
 ```
 
 ## 2. Create the Casbin model
@@ -23,14 +23,11 @@ r = sub, obj, act
 [policy_definition]
 p = sub, obj, act
 
-[role_definition]
-g = _, _
-
 [policy_effect]
 e = some(where (p.eft == allow))
 
 [matchers]
-m = g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act
+m = r.obj == p.obj && r.sub.role == p.sub && r.act == p.act
 ```
 
 ## 3. Create the policy file
@@ -49,16 +46,16 @@ p, admin, post, delete
 ## 4. Create the app
 
 ```python
+from contextlib import asynccontextmanager
 from typing import Annotated
 
-import casbin
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from casbin_fastapi_decorator import PermissionGuard
+from casbin_fastapi_decorator_file import CachedFileEnforcerProvider
 
-app = FastAPI()
 bearer = HTTPBearer(auto_error=False)
 
 
@@ -71,24 +68,37 @@ class User(BaseModel):
 # --- Providers ---
 
 async def get_current_user(
-    credentials: Annotated[HTTPAuthorizationCredentials | None, HTTPBearer(auto_error=False)]
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Security(bearer),
+    ],
 ) -> User:
     if not credentials:
         raise HTTPException(401, "Unauthorized")
     return User(role=credentials.credentials)
 
 
-async def get_enforcer() -> casbin.Enforcer:
-    return casbin.Enforcer("casbin/model.conf", "casbin/policy.csv")
+enforcer_provider = CachedFileEnforcerProvider(
+    model_path="casbin/model.conf",
+    policy_path="casbin/policy.csv",
+)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    async with enforcer_provider:
+        yield
 
 
 # --- Guard ---
 
 guard = PermissionGuard(
     user_provider=get_current_user,
-    enforcer_provider=get_enforcer,
+    enforcer_provider=enforcer_provider,
     error_factory=lambda *_: HTTPException(403, "Forbidden"),
 )
+
+app = FastAPI(lifespan=lifespan)
 
 
 # --- Routes ---
@@ -140,14 +150,16 @@ curl -X POST -H "Authorization: Bearer editor" http://localhost:8000/posts
 1. The request arrives at `GET /posts`
 2. `guard.require_permission("post", "read")` intercepts it
 3. `get_current_user` resolves the user from the Bearer token — returns `User(role="viewer")`
-4. `get_enforcer` returns a Casbin enforcer loaded from the model and policy files
-5. The enforcer checks: `enforce("viewer", "post", "read")` → `True` ✓
+4. `CachedFileEnforcerProvider` returns the cached enforcer loaded from `model.conf` and `policy.csv`
+5. The matcher checks `user.role == p.sub`, so `enforce(user, "post", "read")` returns `True`
 6. The route handler runs and returns the posts
 
-If the user were `unknown`, the enforcer would return `False` and `error_factory` would raise an `HTTPException(403)`.
+If you edit `casbin/policy.csv` while the app is running, the next request will
+pick up the change automatically.
 
 ## Next steps
 
 - [PermissionGuard](../core/permission-guard) — learn all configuration options
 - [AccessSubject](../core/access-subject) — dynamic permissions based on request data
+- [File extra](../extras/file/overview) — cached file-based enforcer with hot-reload
 - [JWT extra](../extras/jwt/overview) — replace manual token parsing with `JWTUserProvider`

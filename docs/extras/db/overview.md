@@ -4,7 +4,9 @@ sidebar_position: 1
 
 # Database Overview
 
-The `db` extra adds `DatabaseEnforcerProvider` — a ready-made `enforcer_provider` that loads Casbin policies from a SQLAlchemy async database instead of a static `.csv` file.
+The `db` extra adds `DatabaseEnforcerProvider` - a ready-made
+`enforcer_provider` that loads Casbin policies from a SQLAlchemy async
+database, caches the enforcer, and hot-reloads when data changes.
 
 ## Install
 
@@ -20,21 +22,22 @@ from casbin_fastapi_decorator_db import DatabaseEnforcerProvider
 
 ## Why use it?
 
-With a static `policy.csv` file, changing permissions requires a file update and application restart. Storing policies in a database allows you to:
+Compared to a static `policy.csv`, storing policies in a database lets you:
 
-- Update permissions at runtime without restarting
+- Update permissions at runtime without rebuilding the enforcer on every request
 - Manage policies via an admin API or UI
 - Use standard database tooling (migrations, auditing, backups)
+- Keep a cached enforcer in memory while still reacting to policy changes
 
 ## How it works
 
 `DatabaseEnforcerProvider` is a callable (a FastAPI dependency) that:
 
-1. Opens an async SQLAlchemy session
-2. Queries all rows from your policy table
-3. Converts each row to a `(sub, obj, act)` tuple using your `policy_mapper`
-4. Creates a `casbin.Enforcer` instance and loads the policies into it
-5. Returns the enforcer
+1. Loads and caches a `casbin.Enforcer` on first use
+2. Reads policy rows from your database and maps them with `policy_mapper`
+3. Watches `model.conf` for changes when used inside `async with provider`
+4. Polls the database every `poll_interval` seconds and compares a SHA-256 hash
+5. Reloads the cached enforcer automatically when the model file or DB rows change
 
 ## Setup
 
@@ -93,25 +96,45 @@ guard = PermissionGuard(
 )
 ```
 
+### 5. Start hot-reload in FastAPI lifespan
+
+```python
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    async with enforcer_provider:
+        yield
+
+app = FastAPI(lifespan=lifespan)
+```
+
+Without the context manager the provider still caches the enforcer, but it will
+not watch `model.conf` or poll the database for changes.
+
 ## Constructor parameters
 
 ```python
 DatabaseEnforcerProvider(
     model_path: str,
-    session_factory: async_sessionmaker,
+    session_factory: Callable[..., AsyncSession],
     policy_model: type,
     policy_mapper: Callable[[Any], tuple[str, ...]],
     default_policies: list[tuple[str, ...]] | None = None,
+    poll_interval: float = 30.0,
 )
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
 | `model_path` | `str` | Path to the Casbin model `.conf` file |
-| `session_factory` | `async_sessionmaker` | SQLAlchemy async session factory |
+| `session_factory` | `Callable[..., AsyncSession]` | SQLAlchemy async session factory |
 | `policy_model` | `type` | SQLAlchemy model class for policy rows |
 | `policy_mapper` | `Callable` | Converts a row to a `(sub, obj, act)` tuple |
 | `default_policies` | `list \| None` | Fallback policies if the database is empty |
+| `poll_interval` | `float` | Seconds between database hash checks (default: `30.0`) |
 
 ## Default policies
 
@@ -130,6 +153,13 @@ enforcer_provider = DatabaseEnforcerProvider(
     ],
 )
 ```
+
+## Reload behavior
+
+- `model.conf` changes are detected via `watchdog`
+- database changes are detected by hashing all mapped policy tuples every `poll_interval`
+- once a change is detected, the provider rebuilds the cached enforcer in the background
+- the next request receives the updated enforcer without restarting the app
 
 ## Full example
 

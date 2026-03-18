@@ -37,12 +37,13 @@ The library is built around two classes:
 
 ## Optional extras
 
-The core package handles authorization. Three optional extras extend it:
+The core package handles authorization. Four optional extras extend it:
 
 | Extra | What it adds |
 |---|---|
+| [`file`](./extras/file/overview) | `CachedFileEnforcerProvider` for cached file-based policies with hot-reload |
 | [`jwt`](./extras/jwt/overview) | JWT token extraction and validation from Bearer headers or cookies |
-| [`db`](./extras/db/overview) | Loading Casbin policies from a SQLAlchemy async database |
+| [`db`](./extras/db/overview) | `DatabaseEnforcerProvider` for cached SQLAlchemy-backed policies with hot-reload |
 | [`casdoor`](./extras/casdoor/overview) | OAuth2 login, cookie-based authentication, and remote policy enforcement via [Casdoor](https://casdoor.org/) |
 
 ## Requirements

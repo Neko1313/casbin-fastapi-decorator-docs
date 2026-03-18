@@ -1,15 +1,17 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 ---
 
 # Database Example
 
-A complete example using `casbin-fastapi-decorator` with the `db` extra. Policies are stored in a SQLite database and can be queried at runtime.
+A complete example using `casbin-fastapi-decorator` with the `db` extra.
+Policies are stored in SQLite, and the cached enforcer hot-reloads when the
+database or `model.conf` changes.
 
 ## Install
 
 ```bash
-pip install "casbin-fastapi-decorator[db]" uvicorn aiosqlite
+pip install "casbin-fastapi-decorator[db]" uvicorn aiosqlite python-multipart
 ```
 
 ## Project structure
@@ -63,10 +65,6 @@ class Role(StrEnum):
 ## `db.py`
 
 ```python
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-
-from fastapi import FastAPI
 from model import Permission, Resource, Role
 from sqlalchemy import String, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -102,13 +100,10 @@ async def seed_policies() -> None:
         ])
         await session.commit()
 
-@asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+async def setup_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await seed_policies()
-    yield
-    await engine.dispose()
 ```
 
 ## `auth.py`
@@ -157,13 +152,22 @@ guard = PermissionGuard(
 ## `main.py`
 
 ```python
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Annotated
 from auth import get_current_user
-from authz import guard
-from db import Policy, async_session, lifespan
+from authz import enforcer_provider, guard
+from db import Policy, async_session, engine, setup_db
 from fastapi import Depends, FastAPI, Form
 from model import Permission, PostCreateSchema, PostSchema, Resource, Role, UserSchema
 from sqlalchemy import select
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    await setup_db()
+    async with enforcer_provider:
+        yield
+    await engine.dispose()
 
 app = FastAPI(title="Core + DB Example", lifespan=lifespan)
 
@@ -230,3 +234,7 @@ curl -X DELETE -H "Authorization: Bearer admin" http://localhost:8000/articles/1
 curl -X DELETE -H "Authorization: Bearer viewer" http://localhost:8000/articles/1
 # → {"detail": "Forbidden"}
 ```
+
+If you update rows in the `policies` table while the app is running, the
+provider will detect the new policy hash on the next polling cycle and reload
+the cached enforcer automatically.

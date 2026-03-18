@@ -32,6 +32,13 @@ const sidebars: SidebarsConfig = {
       items: [
         {
           type: 'category',
+          label: 'File',
+          items: [
+            'extras/file/overview',
+          ],
+        },
+        {
+          type: 'category',
           label: 'JWT',
           items: [
             'extras/jwt/overview',
@@ -62,6 +69,7 @@ const sidebars: SidebarsConfig = {
       label: 'Examples',
       items: [
         'examples/basic',
+        'examples/with-file',
         'examples/with-jwt',
         'examples/with-database',
         'examples/with-casdoor',

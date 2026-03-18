@@ -54,10 +54,10 @@ const features: FeatureItem[] = [
       'Built on Apache Casbin — supports RBAC, ABAC, and any access control model you define in your policy files.',
   },
   {
-    title: 'Three optional extras',
+    title: 'Four optional extras',
     badge: '🧩',
     description:
-      'Extend with JWT authentication, SQLAlchemy database-backed policies, or Casdoor OAuth2 — install only what you need.',
+      'Extend with file hot-reload, JWT authentication, SQLAlchemy-backed policies, or Casdoor OAuth2. Install only what you need.',
   },
 ];
 

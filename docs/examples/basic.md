@@ -4,7 +4,8 @@ sidebar_position: 1
 
 # Basic Example
 
-A complete example using only the core package — no extras. Demonstrates `PermissionGuard`, `auth_required`, and `require_permission` with a simple role-based Bearer token.
+A minimal example with manual Bearer authentication and file-based policies via
+`CachedFileEnforcerProvider`.
 
 ## Project structure
 
@@ -30,14 +31,11 @@ r = sub, obj, act
 [policy_definition]
 p = sub, obj, act
 
-[role_definition]
-g = _, _
-
 [policy_effect]
 e = some(where (p.eft == allow))
 
 [matchers]
-m = g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act
+m = r.obj == p.obj && r.sub.role == p.sub && r.act == p.act
 ```
 
 **`casbin/policy.csv`**
@@ -104,18 +102,29 @@ In this example the token is simply the role string (`viewer`, `editor`, `admin`
 ## `authz.py`
 
 ```python
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+
 from auth import get_current_user
-from casbin import Enforcer
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
 
 from casbin_fastapi_decorator import PermissionGuard
+from casbin_fastapi_decorator_file import CachedFileEnforcerProvider
 
-async def get_enforcer() -> Enforcer:
-    return Enforcer("casbin/model.conf", "casbin/policy.csv")
+enforcer_provider = CachedFileEnforcerProvider(
+    model_path="casbin/model.conf",
+    policy_path="casbin/policy.csv",
+)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    async with enforcer_provider:
+        yield
 
 guard = PermissionGuard(
     user_provider=get_current_user,
-    enforcer_provider=get_enforcer,
+    enforcer_provider=enforcer_provider,
     error_factory=lambda *_: HTTPException(403, "Forbidden"),
 )
 ```
@@ -125,11 +134,11 @@ guard = PermissionGuard(
 ```python
 from typing import Annotated
 from auth import get_current_user
-from authz import guard
+from authz import guard, lifespan
 from fastapi import Depends, FastAPI, Form
 from model import Permission, PostCreateSchema, PostSchema, Resource, Role, UserSchema
 
-app = FastAPI(title="Core Example")
+app = FastAPI(title="Core Example", lifespan=lifespan)
 
 MOCK_DB = [
     PostSchema(id=1, title="First Post"),
@@ -163,7 +172,7 @@ async def create_post(data: Annotated[PostCreateSchema, Form]) -> PostSchema:
 ## Running
 
 ```bash
-pip install casbin-fastapi-decorator uvicorn
+pip install "casbin-fastapi-decorator[file]" uvicorn python-multipart
 uvicorn main:app --reload
 ```
 

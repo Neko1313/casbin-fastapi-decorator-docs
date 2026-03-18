@@ -1,5 +1,5 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 ---
 
 # JWT Example
@@ -9,7 +9,7 @@ A complete example using `casbin-fastapi-decorator` with the `jwt` extra. Replac
 ## Install
 
 ```bash
-pip install "casbin-fastapi-decorator[jwt]" uvicorn PyJWT
+pip install "casbin-fastapi-decorator[jwt,file]" uvicorn PyJWT python-multipart
 ```
 
 ## Project structure
@@ -55,17 +55,27 @@ user_provider = JWTUserProvider(
 
 ```python
 from auth import user_provider
-from casbin import Enforcer
-from fastapi import HTTPException
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+from fastapi import FastAPI, HTTPException
 
 from casbin_fastapi_decorator import PermissionGuard
+from casbin_fastapi_decorator_file import CachedFileEnforcerProvider
 
-async def get_enforcer() -> Enforcer:
-    return Enforcer("casbin/model.conf", "casbin/policy.csv")
+enforcer_provider = CachedFileEnforcerProvider(
+    model_path="casbin/model.conf",
+    policy_path="casbin/policy.csv",
+)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    async with enforcer_provider:
+        yield
 
 guard = PermissionGuard(
     user_provider=user_provider,
-    enforcer_provider=get_enforcer,
+    enforcer_provider=enforcer_provider,
     error_factory=lambda *_: HTTPException(403, "Forbidden"),
 )
 ```
@@ -76,11 +86,11 @@ guard = PermissionGuard(
 import jwt as pyjwt
 from typing import Annotated
 from auth import ALGORITHM, SECRET_KEY, user_provider
-from authz import guard
+from authz import guard, lifespan
 from fastapi import Depends, FastAPI, Form
 from model import Permission, PostCreateSchema, PostSchema, Resource, Role, UserSchema
 
-app = FastAPI(title="Core + JWT Example")
+app = FastAPI(title="Core + JWT Example", lifespan=lifespan)
 
 MOCK_DB = [
     PostSchema(id=1, title="First Post"),
@@ -145,4 +155,6 @@ curl -X POST -H "Authorization: Bearer $VIEWER_TOKEN" \
 
 ## Key difference from basic example
 
-The only change is in `auth.py` — instead of manually parsing the Bearer token, `JWTUserProvider` handles the full JWT lifecycle. The rest of the application (routes, guard, Casbin config) stays identical.
+The authentication flow changes in `auth.py` - `JWTUserProvider` handles the
+full JWT lifecycle. The file-based enforcer stays cached and hot-reloadable,
+just like in the [basic example](./basic).
