@@ -77,6 +77,32 @@ async def update_post(post_id: int):
     ...
 ```
 
+## Custom error responses per route
+
+By default, `require_permission()` uses the `error_factory` defined in the guard. You can override it on a per-route basis to return custom status codes or error details:
+
+```python
+def article_not_found_error(user: Any, *resolved_args: Any) -> HTTPException:
+    """Return 404 instead of 403 for denied access."""
+    return HTTPException(status_code=404, detail="Article not found")
+
+@app.get("/articles/draft")
+@guard.require_permission(
+    Resource.POST,
+    Permission.WRITE,
+    error_factory=article_not_found_error,
+)
+async def read_draft():
+    return {"title": "Draft Post"}
+```
+
+When a user without `post:write` permission accesses this route, they'll receive a `404 Not Found` instead of the default `403 Forbidden`, effectively hiding the resource's existence.
+
+The `error_factory` parameter accepts the same signature as the guard-level factory:
+```python
+error_factory=lambda user, *resolved_args: HTTPException(403, "Forbidden")
+```
+
 ## Argument order
 
 Arguments are passed to `enforcer.enforce(user, *args)` in exactly the order you specify them. Make sure the order matches your Casbin model's `[request_definition]`:
