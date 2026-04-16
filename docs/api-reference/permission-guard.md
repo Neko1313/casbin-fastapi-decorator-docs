@@ -94,10 +94,14 @@ Returns a decorator that ensures the user is authenticated. Only calls `user_pro
 
 ---
 
-### `require_permission(*args)`
+### `require_permission(*args, error_factory=None)`
 
 ```python
-def require_permission(self, *args: AccessSubject | Any) -> Callable
+def require_permission(
+    self,
+    *args: AccessSubject | Any,
+    error_factory: Callable[..., Exception] | None = None,
+) -> Callable
 ```
 
 Returns a decorator that performs a full authorization check.
@@ -108,9 +112,15 @@ Returns a decorator that performs a full authorization check.
   - A plain value (string, enum, int, etc.) — passed as-is
   - An `AccessSubject` instance — resolved via FastAPI DI, then transformed by `selector`
 
+- `error_factory` *(optional)* — A callable that **returns** an exception when enforcement fails.
+  - **Type:** `Callable[[Any, *Any], Exception] | None`
+  - **Default:** Uses the `error_factory` from the guard constructor
+  - **Signature:** `(user: Any, *resolved_args: Any) -> Exception`
+  - Allows per-route customization of denial responses (e.g., returning 404 instead of 403)
+
 **Returns:** A decorator function to be applied to a FastAPI route.
 
-**Raises:** The exception returned by `error_factory` when enforcement fails.
+**Raises:** The exception returned by `error_factory` (guard-level or route-level) when enforcement fails.
 
 **Enforcement call:**
 
@@ -134,11 +144,18 @@ class PermissionGuard:
     def auth_required(self) -> Callable:
         return build_auth_decorator(self._user_provider)
 
-    def require_permission(self, *args: AccessSubject | Any) -> Callable:
+    def require_permission(
+        self,
+        *args: AccessSubject | Any,
+        error_factory: Callable[..., Exception] | None = None,
+    ) -> Callable:
+        if error_factory is None:
+            error_factory = self._error_factory
+
         return build_permission_decorator(
             user_provider=self._user_provider,
             enforcer_provider=self._enforcer_provider,
-            error_factory=self._error_factory,
+            error_factory=error_factory,
             args=args,
         )
 ```
