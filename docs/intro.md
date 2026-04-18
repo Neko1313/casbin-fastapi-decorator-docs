@@ -20,13 +20,22 @@ async def list_posts():
 
 No middleware registration. No extra parameters in your function signatures. Just a decorator.
 
-## Why not middleware?
+## Why decorator, not middleware?
 
-| Approach | How it works | Drawback |
-|---|---|---|
-| Middleware | Intercepts all requests, checks URL path | Hard to do per-route logic |
-| Dependency injection | Add `Depends(...)` to every endpoint | Clutters function signatures |
-| **Decorator (this library)** | Decorates the route function directly | Clean, explicit, per-route |
+| Feature | **casbin-fastapi-decorator** | fastapi-authz / fastapi-casbin-auth |
+|---|:---:|:---:|
+| Approach | Decorator per route | Global middleware |
+| Per-route permission config | ✅ | ❌ |
+| Dynamic objects from request | ✅ `AccessSubject` | ❌ |
+| No extra params in endpoint signature | ✅ | ❌ |
+| Native FastAPI DI integration | ✅ | ⚠️ partial |
+| JWT extras | ✅ | ❌ |
+| DB-backed policies (SQLAlchemy async) | ✅ | ❌ |
+| File policies with hot-reload | ✅ | ❌ |
+| Casdoor OAuth2 integration | ✅ | ❌ |
+| Works with `APIRouter` | ✅ | ✅ |
+
+Middleware-based authorization checks every incoming request globally. With a decorator, you configure permissions exactly where the route is defined — no hidden side effects, no boilerplate dependencies in every function signature.
 
 ## Core concepts
 
