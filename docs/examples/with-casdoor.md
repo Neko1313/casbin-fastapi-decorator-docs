@@ -62,7 +62,7 @@ from casdoor import AsyncCasdoorSDK
 from fastapi import Depends, FastAPI
 
 app = FastAPI(title="Core + Casdoor Example")
-app.include_router(casdoor.router)  # GET /login, GET /callback, POST /logout
+app.include_router(casdoor.router)  # GET /login, GET /callback, POST /logout, GET /me
 
 @app.get("/")
 async def index() -> dict:
@@ -72,9 +72,11 @@ async def index() -> dict:
     }
 
 
-@app.get("/me")
+# The router already provides GET /me that returns the user profile
+# This custom endpoint demonstrates how to use the casdoor.user_provider
+@app.get("/profile")
 @guard.auth_required()
-async def me(
+async def profile(
     token: Annotated[str, Depends(casdoor.user_provider)],
 ) -> dict:
     sdk: AsyncCasdoorSDK = casdoor.sdk
@@ -124,5 +126,6 @@ curl http://localhost:8000/articles \
 
 - `GET /login` is now the canonical way to start the OAuth2 flow
 - `/callback` should not be called directly; it expects the `state` issued by `/login`
+- `GET /me` returns the current user's profile by parsing the JWT access token (returns 401 if no valid token)
+- `POST /logout` calls Casdoor's SSO logout endpoint when an access token is present, then clears both auth cookies
 - `CasdoorUserProvider` returns the raw `access_token`; the enforcer parses it and uses the default subject format `{owner}/{name}`
-- `POST /logout` clears both auth cookies

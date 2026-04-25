@@ -45,7 +45,7 @@ casdoor = CasdoorIntegration(
 )
 
 app = FastAPI()
-app.include_router(casdoor.router)  # GET /login, GET /callback, POST /logout
+app.include_router(casdoor.router)  # GET /login, GET /callback, POST /logout, GET /me
 guard = casdoor.create_guard()
 
 @app.get("/articles")
@@ -69,8 +69,9 @@ async def list_articles() -> dict:
 
 1. `GET /login` issues a one-time OAuth2 `state` value and redirects the browser to Casdoor.
 2. `GET /callback` validates that `state`, exchanges the OAuth2 code for tokens, writes `access_token` and `refresh_token` cookies, and redirects to `redirect_after_login`.
-3. `POST /logout` clears both auth cookies.
-4. Protected routes use the raw `access_token` as the user identity; the Casdoor enforcer parses the JWT and performs remote authorization against Casdoor.
+3. `POST /logout` calls Casdoor's SSO logout endpoint when an access token is present, then clears both auth cookies.
+4. `GET /me` returns the current user's profile by parsing the JWT access token.
+5. Protected routes use the raw `access_token` as the user identity; the Casdoor enforcer parses the JWT and performs remote authorization against Casdoor.
 
 ## Default state protection
 
