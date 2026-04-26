@@ -58,9 +58,10 @@ guard = casdoor.create_guard()
 
 That gives you these endpoints immediately:
 
-- `GET /login`
-- `GET /callback`
-- `POST /logout`
+- `GET /login` — start OAuth2 login flow
+- `GET /callback` — OAuth2 callback handler
+- `POST /logout` — logout and trigger Casdoor SSO logout
+- `GET /me` — get current user's profile
 
 ## 3. Protect routes
 
